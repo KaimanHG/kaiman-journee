@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ma journée</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #fcfcfb);
+    --bg2: var(--tg-theme-secondary-bg-color, #f2f1ec);
+    --ink: var(--tg-theme-text-color, #2e2c27);
+    --soft: var(--tg-theme-hint-color, #6b6a63);
+    --accent: var(--tg-theme-button-color, #c6613f);
+    --accent-ink: var(--tg-theme-button-text-color, #ffffff);
+    --line: color-mix(in srgb, var(--soft) 25%, transparent);
+    --ok: #3f8f5a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.4 -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 16px 16px calc(24px + env(safe-area-inset-bottom)); }
+  header { margin-bottom: 14px; }
+  .date { color: var(--soft); font-size: 13px; text-transform: capitalize; }
+  h1 { font: 600 24px/1.2 Georgia, serif; margin: 4px 0 10px; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { background: var(--bg2); border-radius: 999px; padding: 5px 11px; font-size: 13px; }
+  .bar { height: 6px; background: var(--bg2); border-radius: 3px; overflow: hidden; margin-top: 10px; }
+  .bar > div { height: 100%; background: var(--accent); }
+  section { margin-top: 22px; }
+  h2 { font-size: 13px; font-weight: 600; color: var(--soft); text-transform: uppercase; letter-spacing: .04em; margin: 0 0 8px; }
+  .card { background: var(--bg2); border-radius: 14px; padding: 4px 0; }
+  .row { display: flex; gap: 12px; padding: 11px 14px; align-items: flex-start; border-top: 1px solid var(--line); }
+  .row:first-child { border-top: 0; }
+  .time { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 46px; }
+  .txt { flex: 1; white-space: pre-wrap; word-break: break-word; }
+  .done .txt, .done .time { color: var(--soft); text-decoration: line-through; }
+  .ico { width: 20px; text-align: center; }
+  .acts { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  button { font: inherit; border: 0; border-radius: 10px; padding: 7px 12px; background: var(--bg); color: var(--ink); cursor: pointer; }
+  button.main { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  button.on { background: var(--accent); color: var(--accent-ink); }
+  .empty { padding: 14px; color: var(--soft); }
+  .bilan { display: grid; gap: 10px; padding: 12px 14px; }
+  .bilan .q { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  form { display: grid; gap: 8px; padding: 12px 14px; }
+  input, select, textarea { font: inherit; width: 100%; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  details summary { cursor: pointer; padding: 12px 14px; font-weight: 600; }
+  .brief { padding: 0 14px 14px; white-space: pre-wrap; }
+  .brief blockquote { margin: 6px 0; padding-left: 10px; border-left: 3px solid var(--line); color: var(--soft); }
+  .err { background: #fde8e4; color: #8a2b16; padding: 12px; border-radius: 12px; margin-top: 12px; }
+  .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 999px; font-size: 13px; opacity: 0; transition: opacity .2s; }
+  .toast.show { opacity: .92; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="date" id="date"></div>
+    <h1 id="titre">Ma journée</h1>
+    <div class="chips" id="chips"></div>
+    <div class="bar"><div id="boss" style="width:0"></div></div>
+  </header>
+  <div id="err"></div>
+
+  <section>
+    <h2>Aujourd'hui</h2>
+    <div class="card" id="jour"><div class="empty">Chargement…</div></div>
+  </section>
+
+  <section id="qsec" hidden>
+    <h2>À trancher</h2>
+    <div class="card" id="questions"></div>
+  </section>
+
+  <section>
+    <h2>Les 7 prochains jours</h2>
+    <div class="card" id="avenir"></div>
+  </section>
+
+  <section>
+    <h2>Bilan du soir</h2>
+    <div class="card bilan" id="bilan"></div>
+  </section>
+
+  <section>
+    <h2>Ajouter</h2>
+    <div class="card">
+      <form id="frappel">
+        <input name="texte" placeholder="Rappel : appeler la banque…" required>
+        <div class="two">
+          <input name="quand" type="datetime-local" required>
+          <select name="sujet">
+            <option value="vie">🏠 Vie</option><option value="famille">👨‍👩‍👦 Famille</option>
+            <option value="admin">🧾 Admin</option><option value="sante">💊 Santé</option><option value="desk">📈 Desk</option>
+          </select>
+        </div>
+        <select name="recurrence">
+          <option value="">Une seule fois</option><option value="1440">Chaque jour</option>
+          <option value="4320">Tous les 3 jours</option><option value="10080">Chaque semaine</option>
+        </select>
+        <button class="main" type="submit">⏰ Créer le rappel</button>
+      </form>
+      <form id="fnote" style="border-top:1px solid var(--line)">
+        <textarea name="texte" rows="2" placeholder="Une idée, un truc à ne pas oublier…" required></textarea>
+        <button class="main" type="submit">🗒 Noter</button>
+      </form>
+    </div>
+  </section>
+
+  <section>
+    <div class="card"><details><summary>🌅 Brief du matin</summary><div class="brief" id="brief"></div></details></div>
+  </section>
+
+  <section id="homesec" hidden>
+    <button class="main" id="home" style="width:100%">📲 Mettre Ma journée sur l'écran d'accueil</button>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const API = "https://ejtrvtgvaznaortmjqei.supabase.co/functions/v1/desk-telegram";
+const tg = window.Telegram?.WebApp;
+const ICO = { sante: "💊", admin: "🧾", desk: "📈", vie: "🏠", famille: "👨‍👩‍👦" };
+const BILAN = [
+  { k: "seance", t: "Séance propre", o: [["oui", "✅"], ["non", "❌"], ["off", "Pas tradé"]] },
+  { k: "sport", t: "Sport", o: [["oui", "✅"], ["non", "❌"], ["repos", "Repos"]] },
+  { k: "ecrans", t: "Écrans coupés", o: [["oui", "✅"], ["non", "❌"]] },
+];
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const heure = (iso) => new Date(iso).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" });
+const jourCourt = (iso) => new Date(iso).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", weekday: "short", day: "2-digit", month: "2-digit" });
+
+function toast(t) { const el = $("toast"); el.textContent = t; el.classList.add("show"); setTimeout(() => el.classList.remove("show"), 1600); }
+
+async function call(body = {}) {
+  const r = await fetch(API, { method: "POST", headers: { "content-type": "application/json", "x-tg-init-data": tg?.initData ?? "" }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `erreur ${r.status}`);
+  return j;
+}
+
+function render(d) {
+  $("err").innerHTML = "";
+  const now = new Date(d.maintenant);
+  $("date").textContent = now.toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", weekday: "long", day: "numeric", month: "long" });
+  const restants = d.rappels.filter((r) => ["a_venir", "envoye"].includes(r.statut)).length;
+  $("titre").textContent = restants ? `${restants} chose${restants > 1 ? "s" : ""} à tenir aujourd'hui` : "Rien d'autre aujourd'hui";
+  const maurice = Math.ceil((Date.UTC(2026, 11, 8) - Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())) / 86400000);
+  const dow = new Date(d.jour + "T12:00:00Z").getUTCDay();
+  $("chips").innerHTML = [
+    dow >= 1 && dow <= 5 ? "📈 Séance 11–16 h" : "",
+    `🎯 Boss 1 : ${d.boss.propres}/16`,
+    maurice > 0 ? `🌴 Maurice J-${maurice}` : "",
+    d.questions.length ? `❓ ${d.questions.length} à trancher` : "",
+  ].filter(Boolean).map((c) => `<span class="chip">${c}</span>`).join("");
+  $("boss").style.width = `${Math.min(100, (d.boss.propres / 16) * 100)}%`;
+
+  $("jour").innerHTML = d.rappels.length ? d.rappels.map((r) => {
+    const done = ["fait", "ignore"].includes(r.statut);
+    return `<div class="row ${done ? "done" : ""}">
+      <div class="time">${heure(r.quand)}</div><div class="ico">${ICO[r.sujet] ?? "🔔"}</div>
+      <div class="txt">${esc(r.texte)}${done ? "" : `<div class="acts">
+        <button class="main" data-a="fait" data-id="${r.id}">✅ Fait</button>
+        <button data-a="report" data-m="30" data-id="${r.id}">+30 min</button>
+        <button data-a="report" data-m="120" data-id="${r.id}">+2 h</button>
+        <button data-a="skip" data-id="${r.id}">Pas aujourd'hui</button></div>`}</div></div>`;
+  }).join("") : `<div class="empty">Aucun rappel aujourd'hui.</div>`;
+
+  $("qsec").hidden = !d.questions.length;
+  $("questions").innerHTML = d.questions.map((q) => `<div class="row"><div class="ico">❓</div><div class="txt">${esc(q.question)}</div></div>`).join("")
+    + `<div class="row"><div class="txt"><button class="main" id="ouvrirbot">Répondre dans Telegram</button></div></div>`;
+
+  $("avenir").innerHTML = d.avenir.length ? d.avenir.map((r) => `<div class="row"><div class="time">${jourCourt(r.quand)}<br>${heure(r.quand)}</div><div class="ico">${ICO[r.sujet] ?? "🔔"}</div><div class="txt">${esc(r.texte)}</div></div>`).join("")
+    : `<div class="empty">Rien de prévu.</div>`;
+
+  $("bilan").innerHTML = BILAN.map((b) => `<div class="q"><span>${b.t}</span><span>${b.o.map(([v, l]) =>
+    `<button class="${d.bilan?.[b.k] === v ? "on" : ""}" data-b="${b.k}" data-v="${v}">${l}</button>`).join(" ")}</span></div>`).join("");
+
+  $("brief").innerHTML = d.brief ? d.brief.texte.replace(/<(?!\/?(b|i|blockquote)\b)[^>]*>/g, "").replace(/<blockquote expandable>/g, "<blockquote>") : "Pas encore de brief.";
+}
+
+async function load(body) {
+  try { render(await call(body)); }
+  catch (e) { $("err").innerHTML = `<div class="err">${esc(e.message)}. Ouvre Ma journée depuis le bot Telegram.</div>`; }
+}
+
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  tg?.HapticFeedback?.impactOccurred("light");
+  if (b.dataset.a) { await load({ action: b.dataset.a, id: b.dataset.id, minutes: b.dataset.m }); toast(b.dataset.a === "fait" ? "Fait ✅" : "Noté"); }
+  else if (b.dataset.b) { await load({ action: "bilan", k: b.dataset.b, v: b.dataset.v }); toast("Noté"); }
+  else if (b.id === "ouvrirbot") tg?.close();
+  else if (b.id === "home") tg?.addToHomeScreen?.();
+});
+
+$("frappel").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  await load({ action: "rappel", texte: f.get("texte"), quand: new Date(f.get("quand")).toISOString(), sujet: f.get("sujet"), recurrence: f.get("recurrence") });
+  e.target.reset(); toast("Rappel créé ⏰");
+});
+$("fnote").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  await load({ action: "note", texte: new FormData(e.target).get("texte") });
+  e.target.reset(); toast("Noté 🗒");
+});
+
+tg?.ready(); tg?.expand();
+if (tg?.checkHomeScreenStatus) tg.checkHomeScreenStatus((s) => { $("homesec").hidden = !(s === "missed" || s === "unknown"); });
+load();
+setInterval(() => load(), 60000);
+</script>
+</body>
+</html>
