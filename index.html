@@ -135,7 +135,7 @@ const jourCourt = (iso) => new Date(iso).toLocaleDateString("fr-FR", { timeZone:
 function toast(t) { const el = $("toast"); el.textContent = t; el.classList.add("show"); setTimeout(() => el.classList.remove("show"), 1600); }
 
 async function call(body = {}) {
-  const r = await fetch(API, { method: "POST", headers: { "content-type": "application/json", "x-tg-init-data": tg?.initData ?? "" }, body: JSON.stringify(body) });
+  const r = await fetch(API, { method: "POST", headers: { "content-type": "application/json", "x-tg-init-data": tg?.initData || "absent" }, body: JSON.stringify(body) });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || `erreur ${r.status}`);
   return j;
@@ -193,7 +193,7 @@ document.addEventListener("click", async (e) => {
   if (b.dataset.a) { await load({ action: b.dataset.a, id: b.dataset.id, minutes: b.dataset.m }); toast(b.dataset.a === "fait" ? "Fait ✅" : "Noté"); }
   else if (b.dataset.b) { await load({ action: "bilan", k: b.dataset.b, v: b.dataset.v }); toast("Noté"); }
   else if (b.id === "ouvrirbot") tg?.close();
-  else if (b.id === "home") tg?.addToHomeScreen?.();
+  else if (b.id === "home") { try { tg?.addToHomeScreen?.(); } catch (e) {} }
 });
 
 $("frappel").addEventListener("submit", async (e) => {
@@ -208,9 +208,11 @@ $("fnote").addEventListener("submit", async (e) => {
   e.target.reset(); toast("Noté 🗒");
 });
 
-tg?.ready(); tg?.expand();
-if (tg?.checkHomeScreenStatus) tg.checkHomeScreenStatus((s) => { $("homesec").hidden = !(s === "missed" || s === "unknown"); });
 load();
+try { tg?.ready(); tg?.expand(); } catch (e) {}
+try {
+  if (tg?.isVersionAtLeast?.("8.0")) tg.checkHomeScreenStatus((s) => { $("homesec").hidden = !(s === "missed" || s === "unknown"); });
+} catch (e) {}
 setInterval(() => load(), 60000);
 </script>
 </body>
