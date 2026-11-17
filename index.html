@@ -54,39 +54,10 @@
 .late { color: #d9534f; font-size: 11px; }
 .txt a { color: var(--link, #2a7ae2); font-size: 13px; }
 .sub { color: var(--hint, #8a8a8a); font-size: 12px; margin-top: 2px; }
-/* Séance */
-.ex { background: var(--bg2); border-radius: 14px; padding: 12px 14px; margin-top: 12px; }
-.ex h3 { margin: 0; font-size: 16px; }
-.ex .presc { color: var(--soft); font-size: 13px; margin-top: 2px; }
-.ex .cue { font-size: 13px; margin-top: 6px; }
-.ex .prev { font-size: 12px; color: var(--soft); margin-top: 6px; }
-.set { display: grid; grid-template-columns: 28px 1fr 1fr 44px; gap: 8px; align-items: center; margin-top: 8px; }
-.set .n { color: var(--soft); font-variant-numeric: tabular-nums; }
-.set input { padding: 10px; text-align: center; font-size: 17px; }
-.set button { padding: 10px 0; font-size: 17px; }
-.set.ok input { border-color: var(--ok); }
-.set.ok button { background: var(--ok); color: #fff; }
-.exhead { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
-.badge { font-size: 12px; color: var(--soft); white-space: nowrap; }
-.modif { margin-top: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.modif input { flex: 1; min-width: 160px; }
-.labels { display: grid; grid-template-columns: 28px 1fr 1fr 44px; gap: 8px; font-size: 11px; color: var(--soft); margin-top: 10px; text-align: center; }
-.progress { position: sticky; top: 0; background: var(--bg); padding: 8px 0; z-index: 2; }
 </style>
 </head>
 <body>
-<main id="seanceview" hidden>
-  <div class="progress">
-    <button id="s_retour">← Ma journée</button>
-    <div class="bar"><div id="s_bar" style="width:0"></div></div>
-  </div>
-  <div class="date" id="s_date"></div>
-  <h1 id="s_titre">Séance du jour</h1>
-  <div id="s_err"></div>
-  <div id="s_ex"></div>
-  <section><button class="main" id="s_fin" style="width:100%;padding:14px">✅ Terminer la séance</button></section>
-</main>
-<main id="mainview">
+<main>
   <header>
     <div class="date" id="date"></div>
     <h1 id="titre">Ma journée</h1>
@@ -98,10 +69,6 @@
   <section>
     <h2>Aujourd'hui</h2>
     <div class="card" id="jour"><div class="empty">Chargement…</div></div>
-  </section>
-
-  <section id="seancesec" hidden>
-    <button class="main" id="ouvrirseance" style="width:100%;padding:12px">🏋️ Séance du jour</button>
   </section>
 
   <section id="ssec" hidden>
@@ -220,7 +187,6 @@ function render(d) {
   $("semaine").innerHTML = sem.map((m) => `<div class="row"><div class="time">${ech(m.echeance)}</div><div class="ico">${m.avec ? "🤝" : "🫵"}</div>
     <div class="txt">${m.avec ? `<b>${esc(m.pour)}</b> : ` : ""}${esc(m.titre)}${m.url ? ` <a href="${esc(m.url)}" target="_blank" rel="noopener">ouvrir</a>` : ""}</div></div>`).join("");
 
-  $("seancesec").hidden = false;
   $("qsec").hidden = !d.questions.length;
   $("questions").innerHTML = d.questions.map((q) => `<div class="row"><div class="ico">❓</div><div class="txt">${esc(q.question)}</div></div>`).join("")
     + `<div class="row"><div class="txt"><button class="main" id="ouvrirbot">Répondre dans Telegram</button></div></div>`;
@@ -261,11 +227,6 @@ document.addEventListener("click", async (e) => {
   if (b.dataset.a) { await load({ action: b.dataset.a, id: b.dataset.id, minutes: b.dataset.m }); toast(b.dataset.a === "fait" ? "Fait ✅" : "Noté"); }
   else if (b.dataset.b) { await load({ action: "bilan", k: b.dataset.b, v: b.dataset.v }); toast("Noté"); }
   else if (b.id === "ouvrirbot") tg?.close();
-  else if (b.id === "ouvrirseance") openSeance();
-  else if (b.id === "s_retour") closeSeance();
-  else if (b.id === "s_fin") finSeance();
-  else if (b.dataset.chk !== undefined) toggleSet(+b.dataset.e, +b.dataset.s);
-  else if (b.dataset.mod !== undefined) toggleMod(+b.dataset.mod);
   else if (b.id === "home") { try { tg?.addToHomeScreen?.(); } catch (e) {} }
 });
 
@@ -281,96 +242,12 @@ $("fnote").addEventListener("submit", async (e) => {
   e.target.reset(); toast("Noté 🗒");
 });
 
-// ---------- Séance du jour ----------
-let S = null; // { jour, titre, exercices: [{nom, presc, cue, sets:[{charge,reps,fait}], modifie, note}], fini }
-let D = {};   // dernière fois par exercice
-let saveT = null;
-function buildState(r) {
-  const plan = r.plan, saved = r.seance;
-  D = r.derniere || {};
-  if (!plan && !saved) return null;
-  const ex = (plan?.exercices || saved?.exercices || []).map((pe, i) => {
-    const se = (saved?.exercices || []).find((x) => x.nom === pe.nom) || {};
-    const n = Math.max(pe.series || 0, (se.sets || []).length, 1);
-    const sets = Array.from({ length: n }, (_, k) => ({ charge: "", reps: "", fait: false, ...((se.sets || [])[k] || {}) }));
-    return { nom: pe.nom, presc: pe.presc || "", cue: pe.cue || "", sets, modifie: !!se.modifie, note: se.note || "" };
-  });
-  return { jour: r.jour, titre: plan?.titre || saved?.titre || "Séance", exercices: ex, fini: !!saved?.fini };
-}
-function renderSeance() {
-  $("s_date").textContent = new Date(S.jour + "T12:00:00Z").toLocaleDateString("fr-FR", { timeZone: "UTC", weekday: "long", day: "numeric", month: "long" });
-  $("s_titre").textContent = S.titre;
-  const total = S.exercices.reduce((n, e) => n + e.sets.length, 0);
-  const faites = S.exercices.reduce((n, e) => n + e.sets.filter((x) => x.fait).length, 0);
-  $("s_bar").style.width = `${total ? (faites / total) * 100 : 0}%`;
-  $("s_fin").textContent = S.fini ? "✅ Séance terminée (modifiable)" : `✅ Terminer la séance (${faites}/${total} séries)`;
-  $("s_ex").innerHTML = S.exercices.map((e, i) => {
-    const d = D[e.nom];
-    const prev = d ? `<div class="prev">Dernière fois (${new Date(d.jour + "T12:00:00Z").toLocaleDateString("fr-FR", { timeZone: "UTC", day: "2-digit", month: "2-digit" })}) : ${d.sets.map((x) => `${x.charge || "?"}×${x.reps || "?"}`).join(" · ")}</div>` : "";
-    const done = e.sets.filter((x) => x.fait).length;
-    return `<div class="ex" id="ex${i}">
-      <div class="exhead"><h3>${esc(e.nom)}</h3><span class="badge">${done}/${e.sets.length}</span></div>
-      <div class="presc">${esc(e.presc)}</div>
-      ${e.cue ? `<div class="cue">${esc(e.cue)}</div>` : ""}${prev}
-      <div class="labels"><span>#</span><span>kg</span><span>reps</span><span></span></div>
-      ${e.sets.map((x, k) => `<div class="set ${x.fait ? "ok" : ""}"><span class="n">${k + 1}</span>
-        <input inputmode="decimal" placeholder="${d?.sets[k]?.charge ?? ""}" value="${esc(x.charge)}" data-e="${i}" data-s="${k}" data-f="charge">
-        <input inputmode="numeric" placeholder="${d?.sets[k]?.reps ?? ""}" value="${esc(x.reps)}" data-e="${i}" data-s="${k}" data-f="reps">
-        <button data-chk data-e="${i}" data-s="${k}">${x.fait ? "✓" : "○"}</button></div>`).join("")}
-      <div class="modif"><button class="${e.modifie ? "on" : ""}" data-mod="${i}">🔄 J'ai changé</button>
-        ${e.modifie ? `<input placeholder="Quoi ? (machine, exercice, charge…)" value="${esc(e.note)}" data-e="${i}" data-f="note">` : ""}</div>
-    </div>`;
-  }).join("");
-}
-function saveSoon() { clearTimeout(saveT); saveT = setTimeout(saveNow, 700); }
-async function saveNow(extra = {}) {
-  clearTimeout(saveT);
-  try { await call({ action: "seance_save", jour: S.jour, titre: S.titre, exercices: S.exercices.map(({ nom, sets, modifie, note }) => ({ nom, sets, modifie, note })), fini: S.fini, ...extra }); }
-  catch (e) { toast("Pas enregistré, réessaie"); }
-}
-function toggleSet(i, k) {
-  const x = S.exercices[i].sets[k];
-  // cocher une série vide reprend la dernière fois (ou la série d'avant)
-  if (!x.fait && !x.charge && !x.reps) {
-    const src = S.exercices[i].sets[k - 1] || D[S.exercices[i].nom]?.sets[k] || {};
-    x.charge = src.charge || ""; x.reps = src.reps || "";
-  }
-  x.fait = !x.fait;
-  if (x.fait) { tg?.HapticFeedback?.notificationOccurred("success"); }
-  renderSeance(); saveSoon();
-}
-function toggleMod(i) { S.exercices[i].modifie = !S.exercices[i].modifie; renderSeance(); saveSoon(); }
-document.addEventListener("input", (e) => {
-  const t = e.target; if (!S || t.dataset.e === undefined) return;
-  const ex = S.exercices[+t.dataset.e];
-  if (t.dataset.f === "note") ex.note = t.value; else ex.sets[+t.dataset.s][t.dataset.f] = t.value.replace(",", ".");
-  saveSoon();
-});
-async function finSeance() {
-  const deja = S.fini; S.fini = true;
-  await saveNow({ fini: true, deja_fini: deja });
-  renderSeance(); toast("Séance enregistrée 💪");
-  tg?.HapticFeedback?.notificationOccurred("success");
-}
-async function openSeance() {
-  $("mainview").hidden = true; $("seanceview").hidden = false; window.scrollTo(0, 0);
-  $("s_err").innerHTML = ""; $("s_ex").innerHTML = `<div class="empty">Chargement…</div>`;
-  try {
-    S = buildState(await call({ action: "seance" }));
-    if (!S) { $("s_ex").innerHTML = `<div class="empty">Pas de séance prévue aujourd'hui. Demande-la à Marcus : /marcus envoie ma séance du jour</div>`; $("s_fin").hidden = true; return; }
-    $("s_fin").hidden = false; renderSeance();
-  } catch (e) { $("s_err").innerHTML = `<div class="err">${esc(e.message)}</div>`; }
-}
-function closeSeance() { if (S) saveNow(); $("seanceview").hidden = true; $("mainview").hidden = false; load(); }
-
-const startParam = tg?.initDataUnsafe?.start_param || new URLSearchParams(location.search).get("tgWebAppStartParam") || "";
-if (startParam === "seance") openSeance();
 load();
 try { tg?.ready(); tg?.expand(); } catch (e) {}
 try {
   if (tg?.isVersionAtLeast?.("8.0")) tg.checkHomeScreenStatus((s) => { $("homesec").hidden = !(s === "missed" || s === "unknown"); });
 } catch (e) {}
-setInterval(() => { if ($("seanceview").hidden) load(); }, 60000);
+setInterval(() => load(), 60000);
 </script>
 </body>
 </html>
