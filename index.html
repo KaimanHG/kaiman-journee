@@ -53,6 +53,7 @@
   .toast.show { opacity: .92; }
 .late { color: #d9534f; font-size: 11px; }
 .txt a { color: var(--link, #2a7ae2); font-size: 13px; }
+.sub { color: var(--hint, #8a8a8a); font-size: 12px; margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -190,7 +191,22 @@ function render(d) {
   $("questions").innerHTML = d.questions.map((q) => `<div class="row"><div class="ico">❓</div><div class="txt">${esc(q.question)}</div></div>`).join("")
     + `<div class="row"><div class="txt"><button class="main" id="ouvrirbot">Répondre dans Telegram</button></div></div>`;
 
-  $("avenir").innerHTML = d.avenir.length ? d.avenir.map((r) => `<div class="row"><div class="time">${jourCourt(r.quand)}<br>${heure(r.quand)}</div><div class="ico">${ICO[r.sujet] ?? "🔔"}</div><div class="txt">${esc(r.texte)}</div></div>`).join("")
+  // Une ligne par chose (titre + date de l'évènement), ses rappels en dessous
+  const groupes = [];
+  for (const r of d.avenir) {
+    const k = r.evenement ? `${r.titre ?? r.texte}|${r.evenement}` : `id${r.id}`;
+    let g = groupes.find((x) => x.k === k);
+    if (!g) { g = { k, r, rap: [] }; groupes.push(g); }
+    g.rap.push(r.quand);
+  }
+  groupes.sort((a, b) => new Date(a.r.evenement ?? a.r.quand) - new Date(b.r.evenement ?? b.r.quand));
+  const minuit = (iso) => heure(iso) === "00:00";
+  $("avenir").innerHTML = groupes.length ? groupes.map(({ r, rap }) => {
+    const quand = r.evenement || r.quand;
+    const titre = r.titre || String(r.texte).split("\n")[0];
+    const sous = r.evenement ? `<div class="sub">⏰ rappel ${rap.map((q) => `${jourCourt(q)} ${heure(q)}`).join(", ")}</div>` : "";
+    return `<div class="row"><div class="time">${jourCourt(quand)}${minuit(quand) ? "" : `<br>${heure(quand)}`}</div><div class="ico">${ICO[r.sujet] ?? "🔔"}</div><div class="txt">${esc(titre)}${sous}</div></div>`;
+  }).join("")
     : `<div class="empty">Rien de prévu.</div>`;
 
   $("bilan").innerHTML = BILAN.map((b) => `<div class="q"><span>${b.t}</span><span>${b.o.map(([v, l]) =>
