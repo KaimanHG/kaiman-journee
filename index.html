@@ -120,6 +120,10 @@
     <div class="card"><details><summary>🌅 Brief du matin</summary><div class="brief" id="brief"></div></details></div>
   </section>
 
+  <section>
+    <button class="main" id="cartes" style="width:100%">🗺 Cartes du desk : flux, progression, registre</button>
+  </section>
+
   <section id="homesec" hidden>
     <button class="main" id="home" style="width:100%">📲 Mettre Ma journée sur l'écran d'accueil</button>
   </section>
@@ -227,6 +231,7 @@ document.addEventListener("click", async (e) => {
   if (b.dataset.a) { await load({ action: b.dataset.a, id: b.dataset.id, minutes: b.dataset.m }); toast(b.dataset.a === "fait" ? "Fait ✅" : "Noté"); }
   else if (b.dataset.b) { await load({ action: "bilan", k: b.dataset.b, v: b.dataset.v }); toast("Noté"); }
   else if (b.id === "ouvrirbot") tg?.close();
+  else if (b.id === "cartes") { try { sessionStorage.setItem("tgInit", tg?.initData || ""); } catch (e) {} location.href = "cartes.html" + location.hash; }
   else if (b.id === "home") { try { tg?.addToHomeScreen?.(); } catch (e) {} }
 });
 

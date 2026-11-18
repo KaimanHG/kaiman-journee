@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cartes du desk</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #fcfcfb);
+    --bg2: var(--tg-theme-secondary-bg-color, #f2f1ec);
+    --ink: var(--tg-theme-text-color, #2e2c27);
+    --soft: var(--tg-theme-hint-color, #6b6a63);
+    --accent: var(--tg-theme-button-color, #c6613f);
+    --accent-ink: var(--tg-theme-button-text-color, #ffffff);
+    --line: color-mix(in srgb, var(--soft) 28%, transparent);
+    --vert: #3f8f5a; --orange: #d08a1f; --rouge: #c8442f; --gris: #9a988f;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.4 -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 680px; margin: 0 auto; padding: 14px 14px calc(28px + env(safe-area-inset-bottom)); }
+  a.back { color: var(--soft); text-decoration: none; font-size: 13px; }
+  h1 { font: 600 22px/1.2 Georgia, serif; margin: 6px 0 4px; }
+  .sub { color: var(--soft); font-size: 13px; }
+  .resume { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 4px; }
+  .pill { background: var(--bg2); border-radius: 999px; padding: 5px 11px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; background: var(--gris); }
+  .vert { background: var(--vert); } .orange { background: var(--orange); } .rouge { background: var(--rouge); } .gris { background: var(--gris); }
+  nav { display: flex; gap: 6px; margin: 14px 0 6px; position: sticky; top: 0; background: var(--bg); padding: 6px 0; z-index: 3; overflow-x: auto; }
+  nav button { font: inherit; font-size: 14px; border: 0; border-radius: 999px; padding: 7px 13px; background: var(--bg2); color: var(--ink); white-space: nowrap; }
+  nav button.on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  h2 { font-size: 12px; font-weight: 600; color: var(--soft); text-transform: uppercase; letter-spacing: .05em; margin: 20px 0 8px; }
+  .card { background: var(--bg2); border-radius: 14px; padding: 12px 12px 10px; margin-bottom: 10px; }
+  .ftitle { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .fsub { color: var(--soft); font-size: 13px; margin: 2px 0 10px 17px; }
+  /* Flux : étapes reliées par un fil où circule un point quand tout tourne */
+  .chain { display: flex; align-items: stretch; overflow-x: auto; padding: 4px 2px 8px; scrollbar-width: none; }
+  .chain::-webkit-scrollbar { display: none; }
+  .step { flex: none; background: var(--bg); border: 1.5px solid var(--line); border-radius: 11px; padding: 7px 10px; font-size: 13px; max-width: 132px; display: flex; flex-direction: column; gap: 2px; cursor: default; }
+  .step[data-cle] { cursor: pointer; }
+  .step .s1 { display: flex; align-items: center; gap: 6px; font-weight: 600; line-height: 1.2; }
+  .step .s2 { color: var(--soft); font-size: 11.5px; line-height: 1.25; }
+  .step.e-vert { border-color: color-mix(in srgb, var(--vert) 55%, transparent); }
+  .step.e-orange { border-color: var(--orange); }
+  .step.e-rouge { border-color: var(--rouge); background: color-mix(in srgb, var(--rouge) 9%, var(--bg)); }
+  .wire { flex: none; width: 30px; align-self: center; height: 2px; background: var(--line); position: relative; overflow: visible; }
+  .wire.w-vert, .wire.w-orange { background: color-mix(in srgb, var(--vert) 45%, transparent); }
+  .wire.w-orange { background: color-mix(in srgb, var(--orange) 55%, transparent); }
+  .wire.w-rouge { background: repeating-linear-gradient(90deg, var(--rouge) 0 4px, transparent 4px 8px); }
+  .wire.w-vert::after, .wire.w-orange::after { content: ""; position: absolute; top: -3px; left: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--vert); animation: run 1.6s linear infinite; animation-delay: var(--d, 0s); }
+  .wire.w-orange::after { background: var(--orange); animation-duration: 3.4s; }
+  @keyframes run { 0% { transform: translateX(-4px); opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { transform: translateX(26px); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .wire::after { animation: none !important; opacity: 1; left: 11px; } }
+  .detail { background: var(--bg); border-radius: 10px; padding: 9px 11px; font-size: 13px; margin-top: 4px; }
+  .detail b { font-weight: 600; }
+  .detail .k { color: var(--soft); }
+  /* Progression */
+  .prow { padding: 9px 0; border-top: 1px solid var(--line); }
+  .prow:first-child { border-top: 0; padding-top: 2px; }
+  .ptop { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+  .pname { font-weight: 600; }
+  .pnum { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .bar { height: 7px; background: var(--bg); border-radius: 4px; overflow: hidden; margin: 6px 0 4px; }
+  .bar > div { height: 100%; background: var(--vert); border-radius: 4px; }
+  .pinfo { color: var(--soft); font-size: 12.5px; }
+  /* Registre */
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .chips button { font: inherit; font-size: 13px; border: 0; border-radius: 999px; padding: 5px 11px; background: var(--bg2); color: var(--ink); }
+  .chips button.on { background: var(--ink); color: var(--bg); }
+  .rrow { padding: 9px 0; border-top: 1px solid var(--line); font-size: 14px; }
+  .rrow:first-child { border-top: 0; }
+  .rhead { display: flex; gap: 8px; align-items: baseline; }
+  .tag { font-size: 11px; color: var(--soft); border: 1px solid var(--line); border-radius: 6px; padding: 0 5px; white-space: nowrap; }
+  .rmeta { color: var(--soft); font-size: 12.5px; margin-top: 2px; }
+  .err { background: #fde8e4; color: #8a2b16; padding: 12px; border-radius: 12px; margin-top: 12px; }
+  .legend { color: var(--soft); font-size: 12px; margin-top: 14px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .legend span { display: flex; align-items: center; gap: 5px; }
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="./" id="back">← Ma journée</a>
+  <h1>Cartes du desk</h1>
+  <div class="sub" id="maj">Chargement…</div>
+  <div class="resume" id="resume"></div>
+  <div id="err"></div>
+  <nav id="nav">
+    <button data-v="conseil" class="on">Le Conseil</button>
+    <button data-v="moteur">Le moteur</button>
+    <button data-v="progression">Progression</button>
+    <button data-v="registre">Registre</button>
+  </nav>
+  <div id="vue"></div>
+  <div class="legend">
+    <span><i class="dot vert"></i>tourne</span><span><i class="dot orange"></i>en retard ou à corriger</span>
+    <span><i class="dot rouge"></i>en panne</span><span><i class="dot gris"></i>pas encore mesuré</span>
+  </div>
+</main>
+<script>
+const API = "https://ejtrvtgvaznaortmjqei.supabase.co/functions/v1/desk-cartes";
+const tg = window.Telegram?.WebApp;
+let INIT = tg?.initData || "";
+try { if (INIT) sessionStorage.setItem("tgInit", INIT); else INIT = sessionStorage.getItem("tgInit") || ""; } catch (e) {}
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const RANG = { rouge: 3, orange: 2, vert: 1, gris: 0 };
+const VERDICT = { garder: "Garder", corriger: "À corriger", fusionner: "À fusionner", poubelle: "Poubelle ?", a_evaluer: "À évaluer" };
+const TYPE = { tache: "tâche", file: "file", regle: "règle", bot: "bot", base: "base", idee: "idée", brique: "brique", outil: "outil" };
+let R = [], PAR = {}, vue = "conseil", filtre = "corriger", ouvert = null;
+
+function depuis(iso) {
+  if (!iso) return "jamais contrôlé";
+  const h = (Date.now() - new Date(iso).getTime()) / 3600000;
+  if (h < 1) return "il y a moins d'une heure";
+  if (h < 36) return `il y a ${Math.round(h)} h`;
+  return `il y a ${Math.round(h / 24)} j`;
+}
+// État d'une ligne du registre : panne déclarée, retard sur sa cadence, à corriger, ou qui tourne.
+function etat(r) {
+  if (!r) return "gris";
+  const p = r.preuve || "";
+  if (/^(EN PANNE|ÉCHEC)/i.test(p) || /: ÉCHEC/.test(p)) return "rouge";
+  if (r.verdict === "corriger") return "orange";
+  if (r.type === "tache" && r.fraicheur_h) {
+    if (!r.controle_le) return "gris";
+    if ((Date.now() - new Date(r.controle_le).getTime()) / 3600000 > r.fraicheur_h) return "orange";
+  }
+  if (r.verdict === "a_evaluer" || (!r.preuve && !r.controle_le)) return "gris";
+  return "vert";
+}
+function etatFlux(f) {
+  let pire = "gris";
+  for (const s of f.etapes || []) if (s.cle) { const e = etat(PAR[s.cle]); if (RANG[e] > RANG[pire]) pire = e; }
+  return pire;
+}
+function sousTitre(r) {
+  if (!r) return "";
+  if (r.type === "file" || r.type === "agent") return r.mesure !== null ? `${Number(r.mesure)} en attente` : "";
+  if (r.type === "tache") return r.cadence || "";
+  return "";
+}
+function detail(r) {
+  if (!r) return "";
+  const l = [`<b>${esc(r.nom)}</b> <span class="tag">${esc(VERDICT[r.verdict] || r.verdict)}</span>`];
+  if (r.preuve) l.push(`<span class="k">Preuve :</span> ${esc(r.preuve)}`);
+  l.push(`<span class="k">Contrôle :</span> ${depuis(r.controle_le)}${r.proprietaire ? ` · ${esc(r.proprietaire)}` : ""}`);
+  if (r.conflits) l.push(`<span class="k">Conflit :</span> ${esc(r.conflits)}`);
+  if (r.note) l.push(`<span class="k">Note :</span> ${esc(r.note)}`);
+  return `<div class="detail">${l.join("<br>")}</div>`;
+}
+function carteFlux(f) {
+  const ef = etatFlux(f);
+  let h = "", casse = false;
+  (f.etapes || []).forEach((s, k) => {
+    const r = s.cle ? PAR[s.cle] : null, e = s.cle ? etat(r) : "";
+    if (k) {
+      // le fil prend l'état de l'étape d'arrivée ; après une panne, plus rien ne circule
+      const w = casse ? "gris" : e === "rouge" ? "rouge" : e === "orange" || ef === "orange" ? "orange" : ef === "gris" ? "gris" : "vert";
+      h += `<div class="wire w-${w}" style="--d:${(k * 0.28).toFixed(2)}s"></div>`;
+    }
+    if (e === "rouge") casse = true;
+    h += `<div class="step ${e ? "e-" + e : ""}" ${s.cle ? `data-cle="${esc(s.cle)}" data-f="${esc(f.cle)}"` : ""}>
+      <div class="s1">${s.cle ? `<i class="dot ${e}"></i>` : ""}${esc(s.t)}</div>${r && sousTitre(r) ? `<div class="s2">${esc(sousTitre(r))}</div>` : ""}</div>`;
+  });
+  const det = ouvert && ouvert.f === f.cle ? detail(PAR[ouvert.cle]) : "";
+  return `<div class="card"><div class="ftitle"><i class="dot ${ef}"></i>${esc(f.nom)}</div>
+    <div class="fsub">${esc(f.sert_a || "")}</div><div class="chain">${h}</div>${det}</div>`;
+}
+function vueFlux(carte) {
+  const fl = R.filter((r) => r.type === "flux" && r.carte === carte);
+  const ordre = { rouge: 0, orange: 1, gris: 2, vert: 3 };
+  let h = fl.sort((a, b) => ordre[etatFlux(a)] - ordre[etatFlux(b)]).map(carteFlux).join("");
+  if (carte === "moteur") {
+    const br = R.filter((r) => r.carte === "moteur" && r.type === "brique");
+    h += `<h2>Les briques (${br.length})</h2><div class="card">${br.sort((a, b) => RANG[etat(b)] - RANG[etat(a)]).map(ligne).join("")}</div>`;
+  }
+  return h || `<div class="card">Aucun flux enregistré.</div>`;
+}
+function barre(r) {
+  const m = Number(r.mesure ?? 0), f = Number(r.fait ?? 0), tot = m + f;
+  const pct = tot > 0 ? Math.round((f / tot) * 100) : 0;
+  return `<div class="prow"><div class="ptop"><span class="pname"><i class="dot ${etat(r)}"></i> ${esc(r.nom)}</span>
+    <span class="pnum">${r.fait !== null && tot > 0 ? `${f} / ${tot}` : r.mesure !== null ? m : "?"}</span></div>
+    ${r.fait !== null && tot > 0 ? `<div class="bar"><div style="width:${pct}%"></div></div>` : ""}
+    <div class="pinfo">${r.mesure !== null ? `${m} en attente` : "non mesuré"}${r.cible !== null ? ` → cible ${Number(r.cible)}` : ""}${r.type === "agent" && r.note ? ` · ${esc(r.note)}` : ""}${r.type === "file" && r.proprietaire ? ` · ${esc(r.proprietaire)}` : ""} · ${depuis(r.controle_le)}</div>
+    ${r.type === "file" && r.preuve ? `<div class="pinfo">${esc(r.preuve)}</div>` : ""}</div>`;
+}
+function vueProgression() {
+  const files = R.filter((r) => r.type === "file").sort((a, b) => Number(b.mesure ?? -1) - Number(a.mesure ?? -1));
+  const agents = R.filter((r) => r.type === "agent").sort((a, b) => Number(b.mesure ?? 0) - Number(a.mesure ?? 0));
+  return `<h2>Par base : ce qui reste à vider</h2><div class="card">${files.map(barre).join("")}</div>
+    <h2>Par agent : missions</h2><div class="card">${agents.map(barre).join("")}</div>`;
+}
+function ligne(r) {
+  return `<div class="rrow"><div class="rhead"><i class="dot ${etat(r)}"></i><b>${esc(r.nom)}</b><span class="tag">${esc(TYPE[r.type] || r.type)}</span></div>
+    <div class="rmeta">${esc(VERDICT[r.verdict] || "")}${r.proprietaire ? ` · ${esc(r.proprietaire)}` : ""}${r.demande ? ` · demandé ${esc(r.demande)}` : ""}</div>
+    ${r.preuve ? `<div class="rmeta">${esc(r.preuve)}</div>` : ""}${r.conflits ? `<div class="rmeta">⚠ ${esc(r.conflits)}</div>` : ""}${r.note ? `<div class="rmeta">${esc(r.note)}</div>` : ""}</div>`;
+}
+function vueRegistre() {
+  const base = R.filter((r) => !["flux", "agent"].includes(r.type));
+  const n = (v) => base.filter((r) => r.verdict === v).length;
+  const chips = ["corriger", "poubelle", "fusionner", "a_evaluer", "garder"].map((v) => `<button data-fl="${v}" class="${filtre === v ? "on" : ""}">${VERDICT[v]} ${n(v)}</button>`).join("");
+  const rows = base.filter((r) => r.verdict === filtre);
+  return `<div class="chips">${chips}</div><div class="card">${rows.map(ligne).join("") || "Rien ici."}</div>`;
+}
+function render() {
+  const flux = R.filter((r) => r.type === "flux");
+  const c = { vert: 0, orange: 0, rouge: 0, gris: 0 };
+  flux.forEach((f) => c[etatFlux(f)]++);
+  const pannes = R.filter((r) => etat(r) === "rouge" && r.type !== "flux");
+  $("resume").innerHTML = [
+    `<span class="pill"><i class="dot vert"></i>${c.vert} flux tournent</span>`,
+    c.orange ? `<span class="pill"><i class="dot orange"></i>${c.orange} à surveiller</span>` : "",
+    `<span class="pill"><i class="dot ${pannes.length ? "rouge" : "vert"}"></i>${pannes.length ? `${pannes.length} panne${pannes.length > 1 ? "s" : ""}` : "aucune panne"}</span>`,
+    c.gris ? `<span class="pill"><i class="dot gris"></i>${c.gris} pas encore mesurés</span>` : "",
+  ].join("");
+  document.querySelectorAll("#nav button").forEach((b) => b.classList.toggle("on", b.dataset.v === vue));
+  $("vue").innerHTML = vue === "conseil" ? vueFlux("conseil") : vue === "moteur" ? vueFlux("moteur") : vue === "progression" ? vueProgression() : vueRegistre();
+}
+async function load() {
+  try {
+    const r = await fetch(API, { method: "POST", headers: { "content-type": "application/json", "x-tg-init-data": INIT || "absent" }, body: "{}" });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || `erreur ${r.status}`);
+    R = j.registre || []; PAR = Object.fromEntries(R.map((x) => [x.cle, x]));
+    $("maj").textContent = "État relevé à " + new Date(j.maintenant).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" }) + " · tient à jour tout seul";
+    $("err").innerHTML = "";
+    render();
+  } catch (e) {
+    $("maj").textContent = "";
+    $("err").innerHTML = `<div class="err">${esc(e.message)}. Ouvre les cartes depuis Ma journée, dans Telegram.</div>`;
+  }
+}
+document.addEventListener("click", (e) => {
+  const nav = e.target.closest("#nav button"), fl = e.target.closest("[data-fl]"), st = e.target.closest(".step[data-cle]");
+  if (nav) { vue = nav.dataset.v; ouvert = null; render(); window.scrollTo(0, 0); }
+  else if (fl) { filtre = fl.dataset.fl; render(); }
+  else if (st) {
+    const f = st.dataset.f, cle = st.dataset.cle;
+    ouvert = ouvert && ouvert.f === f && ouvert.cle === cle ? null : { f, cle };
+    tg?.HapticFeedback?.impactOccurred("light"); render();
+  }
+});
+try { tg?.ready(); tg?.expand(); tg?.BackButton?.show(); tg?.BackButton?.onClick(() => { location.href = "./"; }); } catch (e) {}
+load();
+setInterval(load, 120000);
+</script>
+</body>
+</html>
