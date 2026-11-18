@@ -75,6 +75,22 @@
   .err { background: #fde8e4; color: #8a2b16; padding: 12px; border-radius: 12px; margin-top: 12px; }
   .legend { color: var(--soft); font-size: 12px; margin-top: 14px; display: flex; gap: 12px; flex-wrap: wrap; }
   .legend span { display: flex; align-items: center; gap: 5px; }
+  /* Grand écran (ordi, tablette) : plus large, flux en entier sans défilement, cartes en colonnes */
+  @media (min-width: 900px) {
+    body { font-size: 15.5px; }
+    main { max-width: 1180px; padding: 26px 32px 40px; }
+    h1 { font-size: 28px; }
+    .chain { flex-wrap: wrap; row-gap: 12px; overflow: visible; }
+    .step { max-width: 170px; }
+    #vue.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+    #vue.cols > .card, #vue.cols > section > .card { margin-bottom: 0; }
+    #vue.cols > section > h2 { margin-top: 6px; }
+    #vue.cols > .full { grid-column: 1 / -1; }
+    .detail { font-size: 13.5px; }
+  }
+  @media (min-width: 1400px) { main { max-width: 1320px; } .step { max-width: 190px; } }
+  @media (max-width: 380px) { main { padding: 10px 10px 24px; } .step { max-width: 118px; font-size: 12.5px; } .wire { width: 22px; } }
+  @media (hover: hover) { .step[data-cle]:hover { border-color: var(--accent); } nav button:hover { filter: brightness(.96); } }
 </style>
 </head>
 <body>
@@ -100,6 +116,14 @@
 const API = "https://ejtrvtgvaznaortmjqei.supabase.co/functions/v1/desk-cartes";
 const tg = window.Telegram?.WebApp;
 let INIT = tg?.initData || "";
+// Hors Telegram : clé de lecture passée dans le lien (#k=…), gardée sur cet appareil.
+let KEY = "";
+try {
+  const m = location.hash.match(/k=([0-9a-f]{32,})/);
+  if (m) { localStorage.setItem("cartesKey", m[1]); history.replaceState(null, "", location.pathname); }
+  KEY = localStorage.getItem("cartesKey") || "";
+} catch (e) {}
+const DANS_TG = !!INIT;
 try { if (INIT) sessionStorage.setItem("tgInit", INIT); else INIT = sessionStorage.getItem("tgInit") || ""; } catch (e) {}
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -172,7 +196,7 @@ function vueFlux(carte) {
   let h = fl.sort((a, b) => ordre[etatFlux(a)] - ordre[etatFlux(b)]).map(carteFlux).join("");
   if (carte === "moteur") {
     const br = R.filter((r) => r.carte === "moteur" && r.type === "brique");
-    h += `<h2>Les briques (${br.length})</h2><div class="card">${br.sort((a, b) => RANG[etat(b)] - RANG[etat(a)]).map(ligne).join("")}</div>`;
+    h += `<section class="full"><h2>Les briques (${br.length})</h2><div class="card">${br.sort((a, b) => RANG[etat(b)] - RANG[etat(a)]).map(ligne).join("")}</div></section>`;
   }
   return h || `<div class="card">Aucun flux enregistré.</div>`;
 }
@@ -188,8 +212,8 @@ function barre(r) {
 function vueProgression() {
   const files = R.filter((r) => r.type === "file").sort((a, b) => Number(b.mesure ?? -1) - Number(a.mesure ?? -1));
   const agents = R.filter((r) => r.type === "agent").sort((a, b) => Number(b.mesure ?? 0) - Number(a.mesure ?? 0));
-  return `<h2>Par base : ce qui reste à vider</h2><div class="card">${files.map(barre).join("")}</div>
-    <h2>Par agent : missions</h2><div class="card">${agents.map(barre).join("")}</div>`;
+  return `<section><h2>Par base : ce qui reste à vider</h2><div class="card">${files.map(barre).join("")}</div></section>
+    <section><h2>Par agent : missions</h2><div class="card">${agents.map(barre).join("")}</div></section>`;
 }
 function ligne(r) {
   return `<div class="rrow"><div class="rhead"><i class="dot ${etat(r)}"></i><b>${esc(r.nom)}</b><span class="tag">${esc(TYPE[r.type] || r.type)}</span></div>
@@ -215,11 +239,12 @@ function render() {
     c.gris ? `<span class="pill"><i class="dot gris"></i>${c.gris} pas encore mesurés</span>` : "",
   ].join("");
   document.querySelectorAll("#nav button").forEach((b) => b.classList.toggle("on", b.dataset.v === vue));
+  $("vue").classList.toggle("cols", vue === "conseil" || vue === "moteur" || vue === "progression");
   $("vue").innerHTML = vue === "conseil" ? vueFlux("conseil") : vue === "moteur" ? vueFlux("moteur") : vue === "progression" ? vueProgression() : vueRegistre();
 }
 async function load() {
   try {
-    const r = await fetch(API, { method: "POST", headers: { "content-type": "application/json", "x-tg-init-data": INIT || "absent" }, body: "{}" });
+    const r = await fetch(API, { method: "POST", headers: { "content-type": "application/json", "x-tg-init-data": INIT || "absent", ...(KEY ? { "x-cartes-key": KEY } : {}) }, body: "{}" });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || `erreur ${r.status}`);
     R = j.registre || []; PAR = Object.fromEntries(R.map((x) => [x.cle, x]));
@@ -228,7 +253,7 @@ async function load() {
     render();
   } catch (e) {
     $("maj").textContent = "";
-    $("err").innerHTML = `<div class="err">${esc(e.message)}. Ouvre les cartes depuis Ma journée, dans Telegram.</div>`;
+    $("err").innerHTML = `<div class="err">${esc(e.message)}. Ouvre les cartes depuis Ma journée dans Telegram, ou avec ton lien privé (celui qui finit par #k=…).</div>`;
   }
 }
 document.addEventListener("click", (e) => {
@@ -242,6 +267,7 @@ document.addEventListener("click", (e) => {
   }
 });
 try { tg?.ready(); tg?.expand(); tg?.BackButton?.show(); tg?.BackButton?.onClick(() => { location.href = "./"; }); } catch (e) {}
+if (!DANS_TG && !sessionStorage.getItem("tgInit")) $("back").hidden = true;
 load();
 setInterval(load, 120000);
 </script>
