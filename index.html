@@ -120,6 +120,10 @@
     <div class="card"><details><summary>🌅 Brief du matin</summary><div class="brief" id="brief"></div></details></div>
   </section>
 
+  <section id="asec" hidden>
+    <div class="card"><details><summary>📚 Artefacts gardés</summary><div id="artefacts"></div></details></div>
+  </section>
+
   <section>
     <button class="main" id="cartes" style="width:100%">🗺 Cartes du desk : flux, progression, registre</button>
   </section>
@@ -216,6 +220,15 @@ function render(d) {
   $("bilan").innerHTML = BILAN.map((b) => `<div class="q"><span>${b.t}</span><span>${b.o.map(([v, l]) =>
     `<button class="${d.bilan?.[b.k] === v ? "on" : ""}" data-b="${b.k}" data-v="${v}">${l}</button>`).join(" ")}</span></div>`).join("");
 
+  // Artefacts gardés (table artefacts, règle 30) : un toucher ouvre le lien ; « projet: » = document du projet claude.ai Jarvis.
+  const arts = d.artefacts || [];
+  $("asec").hidden = !arts.length;
+  const AICO = { page: "🌐", doc: "📄", tableau: "📊", outil: "🛠" };
+  $("artefacts").innerHTML = arts.map((a) => {
+    const web = /^https:\/\//.test(a.url);
+    const lien = web ? `<a href="${esc(a.url)}" data-lien="${esc(a.url)}">Ouvrir</a>` : `<span class="sub">dans le projet Jarvis : ${esc(String(a.url).replace(/^projet:/, ""))}</span>`;
+    return `<div class="row"><div class="ico">${AICO[a.type] || "📎"}</div><div class="txt"><b>${esc(a.titre)}</b>${a.description ? `<div class="sub">${esc(a.description)}</div>` : ""}<div class="sub">${esc(a.agent || "")} · mis à jour ${jourCourt(a.maj_at)} · ${lien}</div></div></div>`;
+  }).join("");
   $("brief").innerHTML = d.brief ? d.brief.texte.replace(/<(?!\/?(b|i|blockquote)\b)[^>]*>/g, "").replace(/<blockquote expandable>/g, "<blockquote>") : "Pas encore de brief.";
 }
 
@@ -225,6 +238,14 @@ async function load(body) {
 }
 
 document.addEventListener("click", async (e) => {
+  const lien = e.target.closest("a[data-lien]");
+  if (lien) {
+    e.preventDefault();
+    const u = lien.dataset.lien;
+    if (/^https:\/\/t\.me\//.test(u)) tg?.openTelegramLink ? tg.openTelegramLink(u) : (location.href = u);
+    else tg?.openLink ? tg.openLink(u) : window.open(u, "_blank");
+    return;
+  }
   const b = e.target.closest("button");
   if (!b) return;
   tg?.HapticFeedback?.impactOccurred("light");
